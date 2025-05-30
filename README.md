@@ -41,13 +41,14 @@ The Empathetic Agent is focused on gathering the following five pieces of inform
 The conversation is designed to:
 - Ask **one question at a time**.
 - **Gently persist** if the user does not respond, rephrasing the question.
-- **Move on** if the user doesn't respond after 3 attempts.
+- **Move on** if the user doesn't respond after several attempts.
 - **Strictly avoid** casual conversation or open-ended discussions outside the required questions.
 
 ## implmntation Overview:
+
 The agent is deigned to use the power of llm and ai to understand text rather than parse the answer itself
 thogh it call to openAI in order to extract or understand the user answers 
----
+
 
 # 🛠️ Implementation Details
 
@@ -66,9 +67,8 @@ The Empathetic Agent is designed with a strong reliance on the capabilities of L
 - **Contextual Awareness through Conversation History**:
   - When generating the next question, the LLM uses the full conversation history to decide whether to continue insisting on a missing answer, to rephrase, or to move on to the next topic.
   - By reviewing the interaction history, the LLM also better understands the user's communication style and emotional state, leading to a more sensitive and human-like interaction.
-  - **Performance vs. Cost Trade-off**: For better performance, using the conversation history is preferred as it helps maintain rich context. However, there is also an option to disable history usage to save on token usage. When history is disabled, the agent instead provides the LLM with a summary of collected data so far — although this typically results in less fluent and less personalized interactions.
-
-- **The multiple Prompting used**:
+  - **Performance vs. Cost Trade-off**: For better performance, using the conversation history is preferred as it helps maintain rich context. However, there is also an option to disable history usage to save on token usage. When history is disabled, the agent instead provides the LLM with a summary of collected data so far.
+- **Prompts used**:
   - Different prompts are used depending on the task:
     - **Question Generation**: Asking empathetic, context-aware questions.
     - **Information Extraction**: Parsing structured information from user responses.
