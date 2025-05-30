@@ -9,12 +9,11 @@ from text_prompts import REQUIRED_FIELDS
 class FieldStatus(Enum):
     EMPTY = ""
     FILLED = "filled"
+    SKIPPED = "skipped"
    
 class MemoryManager:
     # Define required fields directly in the class
-    #TODO get it from the txt to prevent bugs
-    
-    
+     
     def __init__(self, memory_path="patient_data.json"):
         self.memory_path = memory_path
         self.required_fields = REQUIRED_FIELDS

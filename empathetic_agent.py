@@ -10,25 +10,21 @@ from history_manager import HistoryManager
 import re
 
 
-
-class ConversationMode(Enum):
-    USE_HISTORY = "use_history"
-    NO_HISTORY = "no_history"
-
 class EmpatheticAgent:
     def __init__(self, memory, history_path="conversation_history.json"):
         self.memory = memory
         load_dotenv()
         #TODO might need to extract it in main and pass it to the agent
-        self.api_key = os.getenv("OPENAI_API_KEY_2")
+        self.api_key = os.getenv("OPENAI_API_KEY")
         self.client = OpenAI(api_key=self.api_key)
         self.model = os.getenv("OPENAI_MODEL") or "gpt-4o"
-        self.temperature = float(os.getenv("OPENAI_TEMPERATURE")) or 0.9
+        self.temperature = float(os.getenv("OPENAI_TEMPERATURE")) or 0.8
+        self.strict_temperature = float(os.getenv("STRICT_TEMPERATURE")) or 0.2
         self.history_path = history_path
         self.token_limit = int(os.getenv("TOKEN_LIMIT") or 10000)
         self.encoder = tiktoken.encoding_for_model(self.model)
-        self.use_conversation_history_mode = ConversationMode.USE_HISTORY
-        self.extract_info_temperature = 0
+
+        self.use_conversation_history= bool(os.getenv("USE_HISTORY") or True) 
         
         # Initialize history manager
         self.history_manager = HistoryManager(history_path)
@@ -42,7 +38,7 @@ class EmpatheticAgent:
         trimmed_history = []
         history_exceeded_token_limit = False
 
-        if self.use_conversation_history_mode == ConversationMode.USE_HISTORY:
+        if self.use_conversation_history:
             for msg in reversed(self.history_manager.get_history()):
                 tokens = len(self.encoder.encode(msg["content"]))
                 if total_tokens + tokens > self.token_limit:
@@ -51,18 +47,20 @@ class EmpatheticAgent:
                 trimmed_history.insert(0, msg)
                 total_tokens += tokens
         
-        if history_exceeded_token_limit or self.use_conversation_history_mode == ConversationMode.NO_HISTORY:
+        if history_exceeded_token_limit or not self.use_conversation_history:
             trimmed_history = [{"role": "system", "content": f"the information that is already known about the user is {self.memory.get_state_for_prompt()}"}]
         
         return [system_message] + trimmed_history
 
     def ask(self, user_input=None):
-        if user_input:
-            last_message = self.history_manager.get_last_message()
-            if last_message and last_message["role"] == "assistant": 
-                self.extract_info_with_context(user_input, last_message["content"])
-            
-            self.history_manager.add_message("user", user_input)
+        if user_input is None:
+            user_input = ""
+    
+        last_message = self.history_manager.get_last_message()
+        if last_message and last_message["role"] == "assistant": 
+            self.extract_info_with_context(user_input, last_message["content"])
+        
+        self.history_manager.add_message("user", user_input)
 
         prompt = SYSTEM_BASE_PROMPT
         messages = self.trim_history_to_fit(prompt)
@@ -117,7 +115,7 @@ class EmpatheticAgent:
                 {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0
+            temperature=self.strict_temperature
         )
         return response.choices[0].message.content.strip()
 
@@ -141,7 +139,7 @@ class EmpatheticAgent:
                 {"role": "system", "content": GOODBYE_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3 #TODO think how to set it 
+            temperature = 0.2 #todo change to take from enviorment
         )
         
         return response.choices[0].message.content.strip()
@@ -149,33 +147,19 @@ class EmpatheticAgent:
      
 
     def check_if_question_is_about_field(self, last_assistant_message, field_name=REQUIRED_FIELDS[-1]):
-        prompt = f"""
-            You are reviewing a response from an empathetic AI agent.
-
-            The AI is having a conversation with a woman recently diagnosed with breast cancer. 
-            Its role is to gently and sensitively collect important information about the patient's situation.
-
-            Here is the agent's latest message:
-            
-            {last_assistant_message}
-            
-
-            Your task:
-            Determine whether this message is **still asking about** the specific field: "{field_name}".
-
-            Reply strictly with "Yes" if it is asking about "{field_name}", or "No" if it is not.
-
-            
-            Answer only with **Yes** or **No**.
-            """
+        prompt = FIELD_CHECK_USER_TEMPLATE.format(
+            last_assistant_message = last_assistant_message,
+            field_name = field_name
+        )
+        
         response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are an expert at classifying assistant responses for structured information collection."},
+            model = self.model,
+            messages = [
+                {"role": "system", "content": FIELD_CHECK_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0,
-            max_tokens=5  # TODO think how to set it
+            temperature = self.strict_temperature,
+            max_tokens = 5
         )
 
         answer = response.choices[0].message.content.strip().lower()

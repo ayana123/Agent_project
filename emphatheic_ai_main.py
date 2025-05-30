@@ -20,10 +20,10 @@ if __name__ == "__main__":
 
     try:
         while question_count < max_questions:
-            response = agent.ask(user_input=user_input)
+            response = agent.ask(user_input = user_input)
              
             if memory.is_complete():
-                if not memory.is_last_filed_skipped:
+                if not memory.is_last_filed_skipped():
                     break
                 else:
                     #handle the special case where the agent is still trying 
