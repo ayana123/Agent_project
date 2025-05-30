@@ -76,7 +76,8 @@ class EmpatheticAgent:
         reply = response.choices[0].message.content
         self.history_manager.add_message("assistant", reply)
         return reply
-
+    
+   
     def extract_info_with_context(self, user_input: str, current_question: str) -> dict:
         prompt = self._create_extraction_prompt(user_input, current_question)
         content = self._get_extraction_response(prompt)
@@ -89,13 +90,17 @@ class EmpatheticAgent:
             data = json.loads(content)
         except json.JSONDecodeError:
             data = {}
+        updated_key = None
 
         # Update memory state with extracted information
         for field in REQUIRED_FIELDS:
             if field in data and data[field]:
                 self.memory.update_state(field, data[field])
 
-        return data
+                
+
+
+        return data, updated_key
 
     def _create_extraction_prompt(self, user_input: str, current_question: str) -> str:
         """Create the prompt for information extraction"""
@@ -115,5 +120,67 @@ class EmpatheticAgent:
             temperature=0
         )
         return response.choices[0].message.content.strip()
+
+    def generate_goodbye_message(self, reason: str = "exit") -> str:
+        """
+        Generate a polite goodbye message using OpenAI based on the reason for ending the conversation
+        
+        Args:
+            reason (str): The reason for ending the conversation ('exit', 'complete', or 'max_questions')
+        """
+        collected_data = self.memory.get_collected_data_summary()
+        
+        prompt = GOODBYE_USER_PROMPT_TEMPLATE.format(
+            reason=EXIT_REASONS.get(reason, "the conversation is ending"),
+            collected_data=collected_data
+        )
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": GOODBYE_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3 #TODO think how to set it 
+        )
+        
+        return response.choices[0].message.content.strip()
+    
+     
+
+    def check_if_question_is_about_field(self, last_assistant_message, field_name=REQUIRED_FIELDS[-1]):
+        prompt = f"""
+            You are reviewing a response from an empathetic AI agent.
+
+            The AI is having a conversation with a woman recently diagnosed with breast cancer. 
+            Its role is to gently and sensitively collect important information about the patient's situation.
+
+            Here is the agent's latest message:
+            
+            {last_assistant_message}
+            
+
+            Your task:
+            Determine whether this message is **still asking about** the specific field: "{field_name}".
+
+            Reply strictly with "Yes" if it is asking about "{field_name}", or "No" if it is not.
+
+            
+            Answer only with **Yes** or **No**.
+            """
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": "You are an expert at classifying assistant responses for structured information collection."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0,
+            max_tokens=5  # TODO think how to set it
+        )
+
+        answer = response.choices[0].message.content.strip().lower()
+        return answer == "yes"
+
+
    
     

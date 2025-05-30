@@ -14,7 +14,6 @@ class HistoryManager:
         try:
             if os.path.exists(self.history_path):
                 os.remove(self.history_path)
-                print(f"Cleaned conversation history file: {self.history_path}")
         except Exception as e:
             print(f"Error cleaning history file: {e}")
 
@@ -22,7 +21,7 @@ class HistoryManager:
         """Add a message to the conversation history"""
         message = {
             "role": role,
-            "content": content
+            "content": content,
            # "timestamp": datetime.now().isoformat()
         }
         self.conversation_history.append(message)

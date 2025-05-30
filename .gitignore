@@ -2,3 +2,5 @@ API_kyes
 *.json
 *.cpython
 *.pyc
+.env
+.DS_Store
