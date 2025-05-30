@@ -12,27 +12,34 @@ import re
 
 class EmpatheticAgent:
     def __init__(self, memory, history_path="conversation_history.json"):
+
         self.memory = memory
+        self.history_path = history_path
+
         load_dotenv()
-        #TODO might need to extract it in main and pass it to the agent
         self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
+            raise ValueError("Missing OpenAI API Key. Please set 'OPENAI_API_KEY' in your environment.")
         self.client = OpenAI(api_key=self.api_key)
         self.model = os.getenv("OPENAI_MODEL") or "gpt-4o"
         self.temperature = float(os.getenv("OPENAI_TEMPERATURE")) or 0.8
         self.strict_temperature = float(os.getenv("STRICT_TEMPERATURE")) or 0.2
-        self.history_path = history_path
         self.token_limit = int(os.getenv("TOKEN_LIMIT") or 10000)
-        self.encoder = tiktoken.encoding_for_model(self.model)
-
         self.use_conversation_history= bool(os.getenv("USE_HISTORY") or True) 
         
         # Initialize history manager
         self.history_manager = HistoryManager(history_path)
+        self.encoder = tiktoken.encoding_for_model(self.model)
     
-    def generate_initial_greeting(self):
-        return INITIAL_GREETING
-    
+       
     def trim_history_to_fit(self, base_prompt):
+        """
+        Read and trim the conversation history to fit within the token limit 
+        and prepare it to be sent as part of the prompt to the language model.
+        - If conversation history is enabled, it includes as much recent history as possible.
+        - If history is disabled (USE_HISTORY=False) or exceeds the token limit, 
+        it includes a summary of the data collected so far from the user.
+        """
         system_message = {"role": "system", "content": base_prompt}
         total_tokens = len(self.encoder.encode(base_prompt))
         trimmed_history = []
@@ -53,6 +60,12 @@ class EmpatheticAgent:
         return [system_message] + trimmed_history
 
     def ask(self, user_input=None):
+        """
+        This function processes the user's input by performing the following steps:
+        1. Extracts relevant information based on the user's response and the agent's last question.
+        2. Sends the updated conversation history to the agent to generate the next appropriate question.
+        """
+
         if user_input is None:
             user_input = ""
     
@@ -77,6 +90,16 @@ class EmpatheticAgent:
     
    
     def extract_info_with_context(self, user_input: str, current_question: str) -> dict:
+        """
+        Extracts structured information from the user's response using OpenAI.
+    
+        Args:
+        user_input: The user's response text
+        current_question: The last question asked by the agent
+    
+        Returns:
+        dict: Extracted information about name, age, diagnosis, treatment, and support system.
+        """
         prompt = self._create_extraction_prompt(user_input, current_question)
         content = self._get_extraction_response(prompt)
 
@@ -94,9 +117,6 @@ class EmpatheticAgent:
         for field in REQUIRED_FIELDS:
             if field in data and data[field]:
                 self.memory.update_state(field, data[field])
-
-                
-
 
         return data, updated_key
 
@@ -147,6 +167,16 @@ class EmpatheticAgent:
      
 
     def check_if_question_is_about_field(self, last_assistant_message, field_name=REQUIRED_FIELDS[-1]):
+        """
+        Checks if the agent's last message is still asking about a specific field.
+    
+        Args:
+        last_assistant_message: The last message sent by the agent
+        field_name: The field to check for (defaults to last required field)
+    
+        Returns:
+        bool: True if the message is still asking about the specified field, False otherwise
+        """
         prompt = FIELD_CHECK_USER_TEMPLATE.format(
             last_assistant_message = last_assistant_message,
             field_name = field_name

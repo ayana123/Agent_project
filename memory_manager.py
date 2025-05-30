@@ -12,7 +12,7 @@ class FieldStatus(Enum):
     SKIPPED = "skipped"
    
 class MemoryManager:
-    # Define required fields directly in the class
+    
      
     def __init__(self, memory_path="patient_data.json"):
         self.memory_path = memory_path
