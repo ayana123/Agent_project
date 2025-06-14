@@ -44,7 +44,7 @@ The conversation is designed to:
 - **Move on** if the user doesn't respond after several attempts.
 - **Strictly avoid** casual conversation or open-ended discussions outside the required questions.
 
-## implmntation Overview:
+## implementation Overview:
 
 The agent is deigned to use the power of llm and ai to understand text rather than parse the answer itself
 thogh it call to openAI in order to extract or understand the user answers 
